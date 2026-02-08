@@ -91,6 +91,49 @@ Tyto změny zajistí, že přepis odkazů bude deterministický a konzistentní 
 - `cs/` zůstává read-only; všechna výstupní data jdou do `en/`, `mapping/`, `reports/`, `substack_import/`.
 - Návrh názvů pro anglické soubory: zachovat `postid.slug.html` s přeloženým slugem jako `postid.translated-slug.html`.
 
+### Phased non-destructive workflow (explicitní)
+Pro minimalizaci rizika a možnosti rollbacku rozdělíme celý převod do tří fází. Každá fáze má vlastní výstupní adresář a je nezávislá na předchozích fázích.
+
+- Fáze 1 — `en-translated` (překlad obsahu):
+  - Vstup: `cs/posts/*.html`, `cs/posts.csv`.
+  - Cíl: přeložené HTML soubory uložené do `en-translated/` se stejnými názvy souborů jako v `cs/` (dočasné, zachovávají originální postid a původní slug v názvu souboru).
+  - Dále: vytvořit `en-translated/posts.csv` se stejnou strukturou jako `cs/posts.csv`, kde `title` a `subtitle` jsou první přeložené verze (`title_en`, `subtitle_en`). `post_id` v tomto souboru bude dočasný `<post_numeric_id>.<slug_cs>`.
+  - Verifikace: spustit `tools/qa_checks.py` pro syntaktické kontroly HTML, kontrolu nezměněných tagů, a kontrolu, že neexistují nevhodné `reknisioweb.cz` odkazy.
+  - Rollback: smazat `en-translated/` a znovu spustit překlad.
+
+- Fáze 2 — `en-renamed` (přejmenování podle přeložených titulků):
+  - Vstup: `en-translated/`, `en-translated/posts.csv` (přeložené názvy a titulky).
+  - Proces: z `title_en` v `en-translated/posts.csv` vygenerovat `slug_en` podle pravidel (malá písmena, pomlčky, číslice). Vytvořit `en-renamed/` kopiemi souborů z `en-translated/`, ale přejmenované na nový `en_filename` (`<post_numeric_id>.<slug_en>.html`).
+  - Aktualizace map: v `mapping/post_mapping.csv` doplnit `en_filename`, `slug_en`, `en_url` odpovídající novým názvům.
+  - Verifikace: ověřit, že `en-renamed/` soubory odpovídají `en_filename` a že žádné přejmenování nekoliduje (duplicitní slugs). Pokud jsou kolize, označit řádky v `posts.csv` k ručnímu zásahu.
+  - Rollback: smazat `en-renamed/` a upravit `en-translated/posts.csv` nebo `posts.csv` a znovu spustit přejmenování.
+
+- Fáze 3 — `en` (přepsání odkazů a finalizace):
+  - Vstup: `en-renamed/`, `mapping/post_mapping.csv`, `link_mapping.csv`.
+  - Proces: spustit `tools/rewrite_links.py`, který prochází soubory v `en-renamed/`, přepisuje `href` podle `link_mapping.csv` a vytváří výsledné, produkční soubory v `en/`.
+  - Výstup: `en/` (finalní publikovatelné HTML), `en/posts.csv` (finalní s `post_id` = `<post_numeric_id>.<slug_en>` a přeloženými `title`/`subtitle`), `substack_import/` připravené pro import.
+  - Verifikace: opět `tools/qa_checks.py` (kontrola integrity HTML, testování odkazů, ověření canonical `en_link` formátu). Spustit náhodnou sadu manuálních kontrol (bilingvní QA) nad 10% postů.
+  - Rollback: v případě chyb lze znovu vygenerovat `en` z `en-renamed/` nebo obnovit z Git historie; `en-renamed/` a `en-translated/` zůstávají po dobu QA pro audit.
+
+Další poznámky k fázi:
+- Každá fáze vytváří mapu změn a reporty v `reports/` (např. `reports/phase1_scan.json`, `reports/phase2_rename.csv`, `reports/phase3_link_check.json`).
+- Automatické CI joby by měly běžet pouze na souborech v dané fázi a nikdy nepřepisovat `cs/`.
+- Doporučené příkazy pro lokální běh (příklad):
+```powershell
+# Fáze 1: překlad (pilotní vzorek)
+python tools/translate_html.py --input cs/posts --output en-translated --batch 10
+
+# Fáze 2: přejmenování podle přeložených titles
+python tools/build_mapping.py --posts en-translated/posts.csv --output mapping/post_mapping.csv
+python tools/rename_files.py --mapping mapping/post_mapping.csv --input en-translated --output en-renamed
+
+# Fáze 3: přepis odkazů a export pro Substack
+python tools/rewrite_links.py --mapping mapping/link_mapping.csv --input en-renamed --output en
+python substack/generate_import.py --input en --posts en/posts.csv --output substack_import
+```
+
+Tento fázovaný přístup minimalizuje riziko a umožní postupné kontroly a rollbacky mezi fázemi.
+
 ### Další kroky (rychlý checklist)
 1. Vytvořit `tools/scan_and_report.py` a spustit scan na vzorku 50 souborů.
 2. Vygenerovat `mapping/post_mapping.csv` automaticky pro všechny soubory.
