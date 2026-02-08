@@ -110,8 +110,8 @@ Pro minimalizaci rizika a možnosti rollbacku rozdělíme celý převod do tří
 
 - Fáze 3 — `en` (přepsání odkazů a finalizace):
   - Vstup: `en-renamed/`, `mapping/post_mapping.csv`, `link_mapping.csv`.
-  - Proces: spustit `tools/rewrite_links.py`, který prochází soubory v `en-renamed/`, přepisuje `href` podle `link_mapping.csv` a vytváří výsledné, produkční soubory v `en/`.
-  - Výstup: `en/` (finalní publikovatelné HTML), `en/posts.csv` (finalní s `post_id` = `<post_numeric_id>.<slug_en>` a přeloženými `title`/`subtitle`), `substack_import/` připravené pro import.
+  - Proces: spustit `tools/rewrite_links.py`, který prochází soubory v `en-renamed/`, přepisuje `href` podle `link_mapping.csv` a vytváří výsledné, produkční soubory v `en-rewritten/`.
+  - Výstup: `en-rewritten/` (finalní publikovatelné HTML), `en-rewritten/posts.csv` (finalní s `post_id` = `<post_numeric_id>.<slug_en>` a přeloženými `title`/`subtitle`), `substack_import/` připravené pro import.
   - Verifikace: opět `tools/qa_checks.py` (kontrola integrity HTML, testování odkazů, ověření canonical `en_link` formátu). Spustit náhodnou sadu manuálních kontrol (bilingvní QA) nad 10% postů.
   - Rollback: v případě chyb lze znovu vygenerovat `en` z `en-renamed/` nebo obnovit z Git historie; `en-renamed/` a `en-translated/` zůstávají po dobu QA pro audit.
 
@@ -127,9 +127,9 @@ python tools/translate_html.py --input cs/posts --output en-translated --batch 1
 python tools/build_mapping.py --posts en-translated/posts.csv --output mapping/post_mapping.csv
 python tools/rename_files.py --mapping mapping/post_mapping.csv --input en-translated --output en-renamed
 
-# Fáze 3: přepis odkazů a export pro Substack
-python tools/rewrite_links.py --mapping mapping/link_mapping.csv --input en-renamed --output en
-python substack/generate_import.py --input en --posts en/posts.csv --output substack_import
+# Fáze 3: přepis odkazů a export pro Substack (výstup bude v `en-rewritten`)
+python tools/rewrite_links.py --mapping mapping/link_mapping.csv --input en-renamed --output en-rewritten
+python substack/generate_import.py --input en-rewritten --posts en-rewritten/posts.csv --output substack_import
 ```
 
 Tento fázovaný přístup minimalizuje riziko a umožní postupné kontroly a rollbacky mezi fázemi.
