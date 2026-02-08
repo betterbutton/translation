@@ -1,21 +1,21 @@
 ## Plan: Překlad českého blogu
 
-Krátké shrnutí: Přeložíme obsah ve `cs` do angličtiny bez změny zdrojových souborů; vytvoříme paralelní strom `en`, vygenerujeme mapu `post_id_cs→post_id_en`, přepíšeme odkazy na `better-button.com` a připravíme export pro Substack (HTML/Markdown + metadatové CSV).
+Krátké shrnutí: Přeložíme obsah ve `cs` do angličtiny bez změny zdrojových souborů; vytvoříme paralelní strom `en`, vygenerujeme mapu `slug_cs→slug_en`, přepíšeme odkazy na `better-button.com` a připravíme export pro Substack (HTML/Markdown + metadatové CSV).
 
 ### Mapping
-- Formát CSV: `source_filename,target_filename,post_numeric_id,slug_cs,slug_en,source_url,target_url,translation_status`
-- `source_filename`: název souboru ve `cs` (např. `146260790.proc-vynechavame-vyzkum.html`).
-- `target_filename`: cílový název souboru v `en` (zachovat `postid.` + přeložený slug), např. `146260790.why-do-we-skip-research.html`.
-- `post_numeric_id`: numerická část před tečkou z `source_filename` (např. `146260790`). Tento sloupec bude použit pro jednoznačné párování mezi zdrojem a překladem; hodnoty pro zdroj i cíl jsou shodné.
-- `slug_cs`: část za tečkou v `source_filename` (původní český slug).
+- Formát CSV: `cs_filename,en_filename,post_numeric_id,slug_cs,slug_en,cs_url,en_url,translation_status`
+- `cs_filename`: název souboru ve `cs` (např. `146260790.proc-vynechavame-vyzkum.html`).
+- `en_filename`: cílový název souboru v `en` (zachovat `postid.` + přeložený slug), např. `146260790.why-do-we-skip-research.html`.
+- `post_numeric_id`: numerická část před tečkou z `cs_filename` (např. `146260790`). Tento sloupec bude použit pro jednoznačné párování mezi zdrojem a překladem; hodnoty pro zdroj i cíl jsou shodné.
+- `slug_cs`: část za tečkou v `cs_filename` (původní český slug).
 - `slug_en`: přeložený slug pro cílové URL (pomlčky místo mezer, anglický lowercase).
-- `source_url`: plná URL ve formátu `https://www.reknisioweb.cz/p/` + `slug_cs` (při skládání i varianty bez `www.` mohou v HTML výskytech existovat — scan by je měl detekovat).
-- `target_url`: plná URL ve formátu `https://www.better-button.com/p/` + `slug_en`.
+- `cs_url`: plná URL ve formátu `https://www.reknisioweb.cz/p/` + `slug_cs` (při skládání i varianty bez `www.` mohou v HTML výskytech existovat — scan by je měl detekovat).
+- `en_url`: plná URL ve formátu `https://www.better-button.com/p/` + `slug_en`.
 - `translation_status`: `pending|in_progress|done|review`.
 
 Příklad (CSV header + příklad řádku):
 ```
-source_filename,target_filename,post_numeric_id,slug_cs,slug_en,source_url,target_url,translation_status
+cs_filename,en_filename,post_numeric_id,slug_cs,slug_en,cs_url,en_url,translation_status
 146260790.proc-vynechavame-vyzkum.html,146260790.why-do-we-skip-research.html,146260790,proc-vynechavame-vyzkum,why-do-we-skip-research,https://www.reknisioweb.cz/p/proc-vynechavame-vyzkum,https://www.better-button.com/p/why-do-we-skip-research,done
 ```
 
@@ -23,37 +23,40 @@ Krátké zobrazení mapování souborů:
 - `146260790.proc-vynechavame-vyzkum.html -> 146260790.why-do-we-skip-research.html`
 
 ### Link mapping (pro přepis odkazů uvnitř HTML)
-- Některé odkazy v HTML nebudou přesně odpovídat patternu pro posty (mohou odkazovat na kategorie, feedy, stránky s query stringy nebo externí zdroje). Proto vytvoříme samostatnou mapu pro přepis odkazů.
-- Formát CSV: `source_filename,target_filename,source_link,target_link`
-  - `source_filename`: soubor, ve kterém se odkaz vyskytl.
-  - `target_filename`: cílový soubor po překladu (pokud odkaz směřuje na přeložený post); může být prázdné pro odkazy, které nepřekládáme.
-  - `source_link`: přesná URL, jak se vyskytuje v HTML (detekovat varianty s/bez `www.`, `http`/`https`, trailing slashes, UTM parametry apod.).
-  - `target_link`: canonical cílová URL pro přepis v `en` (pokud existuje) — pro posty musí mít strukturu `https://www.better-button.com/p/` + `slug_en`.
+- V HTML souborech budeme detekovat odkazy obsahující doménu `reknisioweb.cz` (varianty s/bez `www.`). Takové odkazy zapíšeme do samostatné mapy `link_mapping.csv`.
+- Pokud `cs_link` odkazuje na post (cesta má tvar `/p/<slug_cs>`), `en_link` musí být canonicalní `en_url` podle hlavního mapovacího CSV (viz `cs_filename` ↔ `en_filename` mapování). Pokud `cs_link` neodkazuje na post (např. kategorie, feed, externí stránka), `en_link` necháme prázdné a nastavíme `action=review`.
+- Formát CSV: `cs_filename,en_filename,cs_link,normalized_cs_link,en_link,action,notes`
+  - `cs_filename`: český soubor, ve kterém se odkaz vyskytl.
+  - `en_filename`: anglický soubor po překladu (pokud existuje nebo bude existovat).
+  - `cs_link`: přesná URL, jak se vyskytuje v HTML.
+  - `normalized_cs_link`: normalizovaná verze `cs_link` pro klíčování (viz Normalizace URL níže).
+  - `en_link`: canonical cílová URL pro přepis v `en` (pokud se odkaz přepisuje automaticky) — pro posty má tvar `https://www.better-button.com/p/<slug_en>`.
+  - `action`: `map|ignore|review` — u ne-post odkazů se použije `review` a `en_link` zůstane prázdné; pro čisté mapování použít `map`.
+  - `notes`: volitelné poznámky o variantách `cs_link` nebo důvodech review.
 
-  - Požadavky a zásady:
-    - Každý unikátní `source_link` musí mapovat na unikátní `target_link` (konzistence pro přepis napříč soubory).
-    - Pokud `source_link` odkazuje na post, `target_link` musí respektovat `post_numeric_id` a `slug_en` z hlavního mapovacího CSV.
-    - Pokud se `source_link` vyskytuje s různými query parametry nebo protokoly, normalizovat `source_link` pro klíčování a zachovat původní varianty v poznámce.
+- Požadavky a zásady:
+  - Každý unikátní `normalized_cs_link` musí mapovat na jediný `en_link` (konzistence napříč soubory).
+  - Pokud `cs_link` odkazuje na post, `en_link` musí respektovat `post_numeric_id` a `slug_en` z hlavního mapovacího CSV.
+  - U ne-post odkazů bude `en_link` prázdné a `action` = `review`.
+  - Pokud se `cs_link` vyskytuje s různými query parametry nebo protokoly, normalizovat `cs_link` pro klíčování a zachovat původní varianty v `notes`.
 
 Příklad řádku `link_mapping.csv`:
 ```
-source_filename,target_filename,source_link,target_link
-141177637.konference-2024.html,141177637.conferences-2024,https://reknisioweb.cz/p/konference-2024-01,https://www.better-button.com/p/konference-2024-01
+cs_filename,en_filename,cs_link,normalized_cs_link,en_link,action,notes
+141177637.konference-2024.html,141177637.conferences-2024,https://reknisioweb.cz/p/konference-2024-01,https://www.reknisioweb.cz/p/konference-2024-01,https://www.better-button.com/p/konference-2024-01,map,
 ```
 
 Scan požadavky:
-- Před provedením přepisu odkazů spustit `tools/scan_and_report.py` na všech `cs/posts/*.html` a extrahovat všechny `href` obsahující `reknisioweb.cz` nebo `reknisioweb.cz` bez `www.`. Označit, které odkazy odpovídají postům (podle slug patternu) a které odkazují na jiné stránky.
-- Vygenerovat `link_mapping.csv` s jedinečnými `source_link` a navrhovanými `target_link` (nechat prázdné `target_link` pro odkazy, které nebudou přepisovány automaticky).
+- Před provedením přepisu odkazů spustit `tools/scan_and_report.py` na všech `cs/posts/*.html` a extrahovat všechny `href` obsahující `reknisioweb.cz` (s/bez `www.`). Označit, které odkazy odpovídají postům (podle patternu `/p/<slug>`) a které odkazují na jiné stránky.
+- Vygenerovat `link_mapping.csv` s jedinečnými `normalized_cs_link` a navrhovanými `en_link` (nechat prázdné `en_link` + `action=review` pro odkazy, které nebudou přepisovány automaticky).
+
+Normalizace URL (pravidla pro `normalized_cs_link` a `en_link` canonical):
+- Canonical hosty: použít `https://www.` prefix pro `en_link` (`https://www.better-button.com`) a pro normalized `cs_link` použít `https://www.reknisioweb.cz`.
+- Odstranit query parametry a fragmenty (`?` a `#` části) — canonical URL nesmí mít query ani fragment.
+- Odstranit trailing slash a souborové přípony (např. `.html`) — canonical cesta bude bez koncového `/`.
+- `en_link` musí mít přesnou formu: `https://www.better-button.com/p/<slug_en>` (žádné prefixy, žádné další path segmenty).
 
 Tyto změny zajistí, že přepis odkazů bude deterministický a konzistentní napříč celým archivem.
-Příklad (CSV header + příklad řádku):
-```
-source_filename,target_filename,post_id_cs,slug_cs,post_id_en,slug_en,source_url,target_url,translation_status
-146260790.proc-vynechavame-vyzkum.html,146260790.why-do-we-skip-research.html,146260790,proc-vynechavame-vyzkum,146260790,why-do-we-skip-research,https://reknisioweb.cz/posts/146260790.proc-vynechavame-vyzkum.html,https://better-button.com/posts/146260790.why-do-we-skip-research.html,done
-```
-
-Krátké zobrazení mapování souborů:
-- `146260790.proc-vynechavame-vyzkum.html -> 146260790.why-do-we-skip-research.html`
 
 ### Zachování integrity HTML
 - Překládat pouze textové uzly a vybrané atributy (`alt`, `figcaption`, `title`), nepřepisovat HTML tagy, atributy obsahující URL, data-* atributy, inline skripty a JSON-LD.
