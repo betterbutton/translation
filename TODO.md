@@ -108,7 +108,7 @@ Pro minimalizaci rizika a možnosti rollbacku rozdělíme celý převod do tří
   - Verifikace: ověřit, že `en-renamed/` soubory odpovídají `en_filename` a že žádné přejmenování nekoliduje (duplicitní slugs). Pokud jsou kolize, označit řádky v `posts.csv` k ručnímu zásahu.
   - Rollback: smazat `en-renamed/` a upravit `en-translated/posts.csv` nebo `posts.csv` a znovu spustit přejmenování.
 
-- Fáze 3 — `en` (přepsání odkazů a finalizace):
+- Fáze 3 — `en-rewritten` (přepsání odkazů a finalizace):
   - Vstup: `en-renamed/`, `mapping/post_mapping.csv`, `link_mapping.csv`.
   - Proces: spustit `tools/rewrite_links.py`, který prochází soubory v `en-renamed/`, přepisuje `href` podle `link_mapping.csv` a vytváří výsledné, produkční soubory v `en-rewritten/`.
   - Výstup: `en-rewritten/` (finalní publikovatelné HTML), `en-rewritten/posts.csv` (finalní s `post_id` = `<post_numeric_id>.<slug_en>` a přeloženými `title`/`subtitle`), `substack_import/` připravené pro import.
