@@ -11,9 +11,24 @@ Krátké shrnutí: Přeložíme obsah ve `cs` do angličtiny bez změny zdrojov�
 6. Dávkově spusť překlad do nové složky `en/`, spusť QA kontrolní skript `qa_checks.py` a vygeneruj adresář `substack_import/` s exportem (HTML/CSV) připraveným pro import do Substack.
 
 ### Mapping
-- Formát CSV: `source_filename,post_id_cs,slug_cs,post_id_en,slug_en,source_url,target_url,translation_status`
-- Post_id: zachovat původní numerickou část před tečkou jako `post_id_cs`; slovo za tečkou (slug) přeložit do angličtiny a uložit jako `slug_en`.
-- Pokud slug není potřeba měnit (čísla nebo již anglicky), neprovádět změnu, ale doplnit `post_id_en` = `post_id_cs`.
+- Formát CSV: `source_filename,target_filename,post_id_cs,slug_cs,post_id_en,slug_en,source_url,target_url,translation_status`
+- `source_filename`: název souboru ve `cs` (např. `146260790.proc-vynechavame-vyzkum.html`).
+- `target_filename`: cílový název souboru v `en` (zachovat `postid.` + přeložený slug), např. `146260790.why-do-we-skip-research.html`.
+- `post_id_cs`: numerická část před tečkou z `source_filename`.
+- `slug_cs`: část za tečkou v `source_filename`.
+- `post_id_en`: numerická část pro anglickou verzi (obvykle shodná s `post_id_cs`).
+- `slug_en`: přeložený slug (pomlčky místo mezer, anglický lowercase).
+- `source_url` / `target_url`: plné URL pro referenci (volitelné, doporučené pro přepis odkazů).
+- `translation_status`: `pending|in_progress|done|review`.
+
+Příklad (CSV header + příklad řádku):
+```
+source_filename,target_filename,post_id_cs,slug_cs,post_id_en,slug_en,source_url,target_url,translation_status
+146260790.proc-vynechavame-vyzkum.html,146260790.why-do-we-skip-research.html,146260790,proc-vynechavame-vyzkum,146260790,why-do-we-skip-research,https://reknisioweb.cz/posts/146260790.proc-vynechavame-vyzkum.html,https://better-button.com/posts/146260790.why-do-we-skip-research.html,done
+```
+
+Krátké zobrazení mapování souborů:
+- `146260790.proc-vynechavame-vyzkum.html -> 146260790.why-do-we-skip-research.html`
 
 ### Zachování integrity HTML
 - Překládat pouze textové uzly a vybrané atributy (`alt`, `figcaption`, `title`), nepřepisovat HTML tagy, atributy obsahující URL, data-* atributy, inline skripty a JSON-LD.
