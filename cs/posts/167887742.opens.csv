@@ -1,0 +1,5 @@
+post_id,timestamp,email,post_type,post_audience,active_subscription,country,city,region,device_type,client_os,client_type,user_agent
+167887742,2025-07-09T08:28:12.694Z,jurajkejs@gmail.com,newsletter,everyone,true,CZ,,,,,,eMClient/10.3.2412.0
+167887742,2025-07-09T09:21:19.585Z,ondrej@osuchanek.cz,newsletter,everyone,true,CZ,,,,,,"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+167887742,2025-07-10T05:08:27.343Z,muller.contact@gmail.com,newsletter,everyone,true,CZ,,,,,,Mozilla/5.0
+167887742,2025-07-20T07:09:05.515Z,ondrej@osuchanek.cz,newsletter,everyone,true,CZ,,,,,,Mozilla/5.0
